@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"net/http"
 )
 
@@ -28,15 +29,65 @@ func NewClient(token string) *Client {
 	return client
 }
 
-func (c *Client) CreateServer(servConf *ServerConfiguration) (ctid int, err error) {
+func (c *Client) CreateServer(servReq *CreateServerRequest) (ctid int64, err error) {
 	var req *http.Request
-
-	req, err = c.newRequest(http.MethodPost, VSCALE_API_SCALETS, servConf)
-	if err != nil {
+	if req, err = c.newRequest(http.MethodPost, VSCALE_API_SCALETS, servReq); err != nil {
 		return 0, fmt.Errorf("failed to create request with error: %v", err)
 	}
 
-	return 0, nil
+	var (
+		resp *http.Response
+		body []byte
+	)
+
+	if resp, err = c.httpClient.Do(req); err != nil {
+		return 0, fmt.Errorf("failed to response with error: %v", err)
+	}
+	body, _ = ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusNoContent {
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			return 0, ErrTooManyRequests
+		case http.StatusGatewayTimeout:
+			return 0, ErrGatewayTimeout
+		default:
+			var errorResponse ErrorResponse
+			if err = json.Unmarshal(body, &errorResponse); err != nil {
+				return 0, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
+			}
+			return 0, fmt.Errorf("error with status code: %d", resp.StatusCode)
+		}
+	}
+
+	var createServerRespone CreateServerResponse
+	if err = json.Unmarshal(body, &createServerRespone); err != nil {
+		return 0, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
+	}
+
+	return createServerRespone.CTID, nil
+}
+
+func (c *Client) DeleteServer(ctid int64) (err error) {
+	var req *http.Request
+	if req, err = c.newRequest(http.MethodDelete, fmt.Sprint(VSCALE_API_SCALETS, ctid), nil); err != nil {
+		return fmt.Errorf("failed to create request with error: %v", err)
+	}
+
+	var (
+		resp *http.Response
+		body []byte
+	)
+
+	if resp, err = c.httpClient.Do(req); err != nil {
+		return fmt.Errorf("failed to response with error: %v", err)
+	}
+	body, _ = ioutil.ReadAll(resp.Body)
+	defer resp.Body.Close()
+
+
+
 }
 
 func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {
@@ -55,7 +106,7 @@ func (c *Client) newRequest(method, path string, body interface{}) (*http.Reques
 	}
 
 	req.Header.Add("X-Token", c.token)
-	req.Header.Add("Content-Type", "application/json")
+	req.Header.Add("Content-Type", "application/json;charset=UTF-8")
 	req.Header.Add("Accept", "application/json")
 
 	return req, nil
