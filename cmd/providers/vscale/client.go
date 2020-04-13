@@ -29,10 +29,10 @@ func NewClient(token string) *Client {
 	return client
 }
 
-func (c *Client) CreateServer(servReq *CreateServerRequest) (ctid int64, err error) {
+func (c *Client) CreateServer(servReq *CreateServerRequest) (servResp CreateServerResponse, err error) {
 	var req *http.Request
 	if req, err = c.newRequest(http.MethodPost, VSCALE_API_SCALETS, servReq); err != nil {
-		return 0, fmt.Errorf("failed to create request with error: %v", err)
+		return servResp, fmt.Errorf("failed to create request with error: %v", err)
 	}
 
 	var (
@@ -41,7 +41,7 @@ func (c *Client) CreateServer(servReq *CreateServerRequest) (ctid int64, err err
 	)
 
 	if resp, err = c.httpClient.Do(req); err != nil {
-		return 0, fmt.Errorf("failed to response with error: %v", err)
+		return servResp, fmt.Errorf("failed to response with error: %v", err)
 	}
 	body, _ = ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
@@ -49,30 +49,29 @@ func (c *Client) CreateServer(servReq *CreateServerRequest) (ctid int64, err err
 	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusNoContent {
 		switch resp.StatusCode {
 		case http.StatusTooManyRequests:
-			return 0, ErrTooManyRequests
+			return servResp, ErrTooManyRequests
 		case http.StatusGatewayTimeout:
-			return 0, ErrGatewayTimeout
+			return servResp, ErrGatewayTimeout
 		default:
 			var errorResponse ErrorResponse
 			if err = json.Unmarshal(body, &errorResponse); err != nil {
-				return 0, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
+				return servResp, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
 			}
-			return 0, fmt.Errorf("error with status code: %d", resp.StatusCode)
+			return servResp, fmt.Errorf("error with status code: %d", resp.StatusCode)
 		}
 	}
 
-	var createServerRespone CreateServerResponse
-	if err = json.Unmarshal(body, &createServerRespone); err != nil {
-		return 0, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
+	if err = json.Unmarshal(body, &servResp); err != nil {
+		return servResp, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
 	}
 
-	return createServerRespone.CTID, nil
+	return servResp, nil
 }
 
-func (c *Client) DeleteServer(ctid int64) (err error) {
+func (c *Client) DeleteServer(ctid int64) (servResp DeleteServerResponse, err error) {
 	var req *http.Request
 	if req, err = c.newRequest(http.MethodDelete, fmt.Sprint(VSCALE_API_SCALETS, ctid), nil); err != nil {
-		return fmt.Errorf("failed to create request with error: %v", err)
+		return servResp, fmt.Errorf("failed to create request with error: %v", err)
 	}
 
 	var (
@@ -81,13 +80,31 @@ func (c *Client) DeleteServer(ctid int64) (err error) {
 	)
 
 	if resp, err = c.httpClient.Do(req); err != nil {
-		return fmt.Errorf("failed to response with error: %v", err)
+		return servResp, fmt.Errorf("failed to response with error: %v", err)
 	}
 	body, _ = ioutil.ReadAll(resp.Body)
 	defer resp.Body.Close()
 
+	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusNoContent {
+		switch resp.StatusCode {
+		case http.StatusTooManyRequests:
+			return servResp, ErrTooManyRequests
+		case http.StatusGatewayTimeout:
+			return servResp, ErrGatewayTimeout
+		default:
+			var errorResponse ErrorResponse
+			if err = json.Unmarshal(body, &errorResponse); err != nil {
+				return servResp, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
+			}
+			return servResp, fmt.Errorf("error with status code: %d", resp.StatusCode)
+		}
+	}
 
+	if err = json.Unmarshal(body, &servResp); err != nil {
+		return servResp, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
+	}
 
+	return servResp, nil
 }
 
 func (c *Client) newRequest(method, path string, body interface{}) (*http.Request, error) {

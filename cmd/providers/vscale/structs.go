@@ -26,8 +26,12 @@ type (
 		CTID             int64   `json:"ctid,omitempty"`
 	}
 
-	DeleteServerRequest struct {
-		CTID int64
+	DeleteServerResponse struct {
+		CreateServerResponse
+		Deleted           string `json:"deleted,omitempty"`
+		BlockReason       string `json:"block_reason"`
+		BlockReasonCustom string `json:"block_reason_custom"`
+		DateBlock         string `json:"date_block"`
 	}
 
 	Address struct {
@@ -60,5 +64,3 @@ func DefaultCreateServerRequest() *CreateServerRequest {
 		Location: "spb0",
 	}
 }
-
-var _ = `{"error":{"code":"MAKE_FROM_NOT_FOUND","status":404,"message":"make_from not found"}}`

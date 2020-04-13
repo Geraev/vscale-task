@@ -1,8 +1,11 @@
 package vscale
 
-import "errors"
+import (
+	"errors"
+	"net/http"
+)
 
 var (
-	ErrTooManyRequests = errors.New("too many requests")
-	ErrGatewayTimeout  = errors.New("gateway timeout")
+	ErrTooManyRequests = errors.New(http.StatusText(http.StatusTooManyRequests))
+	ErrGatewayTimeout  = errors.New(http.StatusText(http.StatusGatewayTimeout))
 )
