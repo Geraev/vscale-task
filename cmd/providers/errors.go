@@ -1,4 +1,4 @@
-package vscale
+package providers
 
 import (
 	"errors"

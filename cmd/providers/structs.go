@@ -1,4 +1,4 @@
-package vscale
+package providers
 
 type (
 	CreateServerRequest struct {

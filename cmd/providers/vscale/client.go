@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"vscale-task/cmd/providers"
 )
 
 const (
@@ -29,7 +30,7 @@ func NewClient(token string) *Client {
 	return client
 }
 
-func (c *Client) CreateServer(servReq *CreateServerRequest) (servResp CreateServerResponse, err error) {
+func (c *Client) CreateServer(servReq *providers.CreateServerRequest) (servResp providers.CreateServerResponse, err error) {
 	var req *http.Request
 	if req, err = c.newRequest(http.MethodPost, VSCALE_API_SCALETS, servReq); err != nil {
 		return servResp, fmt.Errorf("failed to create request with error: %v", err)
@@ -49,11 +50,11 @@ func (c *Client) CreateServer(servReq *CreateServerRequest) (servResp CreateServ
 	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusNoContent {
 		switch resp.StatusCode {
 		case http.StatusTooManyRequests:
-			return servResp, ErrTooManyRequests
+			return servResp, providers.ErrTooManyRequests
 		case http.StatusGatewayTimeout:
-			return servResp, ErrGatewayTimeout
+			return servResp, providers.ErrGatewayTimeout
 		default:
-			var errorResponse ErrorResponse
+			var errorResponse providers.ErrorResponse
 			if err = json.Unmarshal(body, &errorResponse); err != nil {
 				return servResp, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
 			}
@@ -68,7 +69,7 @@ func (c *Client) CreateServer(servReq *CreateServerRequest) (servResp CreateServ
 	return servResp, nil
 }
 
-func (c *Client) DeleteServer(ctid int64) (servResp DeleteServerResponse, err error) {
+func (c *Client) DeleteServer(ctid int64) (servResp providers.DeleteServerResponse, err error) {
 	var req *http.Request
 	if req, err = c.newRequest(http.MethodDelete, fmt.Sprint(VSCALE_API_SCALETS, ctid), nil); err != nil {
 		return servResp, fmt.Errorf("failed to create request with error: %v", err)
@@ -88,11 +89,11 @@ func (c *Client) DeleteServer(ctid int64) (servResp DeleteServerResponse, err er
 	if resp.StatusCode < http.StatusOK || resp.StatusCode > http.StatusNoContent {
 		switch resp.StatusCode {
 		case http.StatusTooManyRequests:
-			return servResp, ErrTooManyRequests
+			return servResp, providers.ErrTooManyRequests
 		case http.StatusGatewayTimeout:
-			return servResp, ErrGatewayTimeout
+			return servResp, providers.ErrGatewayTimeout
 		default:
-			var errorResponse ErrorResponse
+			var errorResponse providers.ErrorResponse
 			if err = json.Unmarshal(body, &errorResponse); err != nil {
 				return servResp, fmt.Errorf("unmarshaling error: %v: %s", err, string(body))
 			}

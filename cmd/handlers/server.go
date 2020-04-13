@@ -1,4 +1,4 @@
-package httpserver
+package handlers
 
 import (
 	"github.com/gin-gonic/gin"
@@ -14,7 +14,7 @@ type Server struct {
 
 func NewServer(port string, client providers.Client) *Server {
 	return &Server{
-		port: port,
+		port:   port,
 		client: client,
 	}
 }
@@ -39,7 +39,14 @@ func (s *Server) CreateServer(c *gin.Context) {
 		)
 	}
 
+	var (
+		servReq  = providers.DefaultCreateServerRequest()
+		servResp providers.CreateServerResponse
+	)
+
 	for i := 0; i < number; i++ {
-		go s.client.CreateServer()
+		go func() {
+			s.client.CreateServer(servReq)
+		}()
 	}
 }
