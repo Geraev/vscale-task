@@ -1,10 +1,12 @@
 package handlers
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"strconv"
+
 	"vscale-task/cmd/providers"
+
+	"github.com/gin-gonic/gin"
 )
 
 type Server struct {

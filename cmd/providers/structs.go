@@ -1,5 +1,10 @@
 package providers
 
+type Client interface {
+	CreateServer(*CreateServerRequest) (CreateServerResponse, error)
+	DeleteServer(int64) (DeleteServerResponse, error)
+}
+
 type (
 	CreateServerRequest struct {
 		MakeFrom string  `json:"make_from,omitempty"`
