@@ -3,6 +3,7 @@ package handlers
 import (
 	"net/http"
 	"strconv"
+	"vscale-task/cmd/manager"
 
 	"vscale-task/cmd/providers"
 
@@ -10,14 +11,14 @@ import (
 )
 
 type Server struct {
-	port   string
-	client providers.Client
+	port    string
+	manager manager.APIManager
 }
 
-func NewServer(port string, client providers.Client) *Server {
+func NewServer(port string, manager *manager.APIManager) *Server {
 	return &Server{
-		port:   port,
-		client: client,
+		port:    port,
+		manager: *manager,
 	}
 }
 
@@ -32,7 +33,6 @@ func (s *Server) Run() error {
 
 func (s *Server) CreateServer(c *gin.Context) {
 	var param = c.Param("number")
-
 	number, err := strconv.Atoi(param)
 	if err != nil {
 		c.JSON(
@@ -41,14 +41,28 @@ func (s *Server) CreateServer(c *gin.Context) {
 		)
 	}
 
+	var servReq providers.CreateServerRequest
+	if err := c.ShouldBindJSON(&servReq); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+	}
+
 	var (
-		servReq  = providers.DefaultCreateServerRequest()
-		servResp providers.CreateServerResponse
+		groupID    int64
+		err        error
+		isAccepted = make(chan struct{}, 1)
 	)
 
-	for i := 0; i < number; i++ {
-		go func() {
-			s.client.CreateServer(servReq)
-		}()
-	}
+	go func() {
+		if groupID, err = s.manager.CreateServerGroup(&servReq, number); err != nil {
+			switch err {
+			case manager.ErrNeedRollback:
+			default:
+
+			}
+		}
+
+	}()
+
 }

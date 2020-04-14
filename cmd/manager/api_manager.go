@@ -2,7 +2,6 @@ package manager
 
 import (
 	"errors"
-	"swap-free/src/golang.org/x/tools/go/analysis/passes/copylock/testdata/src/a"
 	"sync"
 	"time"
 	"vscale-task/cmd/storage"
@@ -111,7 +110,7 @@ func (m *APIManager) DeleteServerGroup(groupID int64) (err error) {
 					}
 				}
 
-				m.Storage.AddServer(groupID, servResp.CTID)
+				m.Storage.RemoveServer(groupID, servResp.CTID)
 			}()
 		}
 	}
