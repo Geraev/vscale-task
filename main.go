@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"log"
 
 	"vscale-task/cmd/httpserver"
@@ -18,10 +19,13 @@ var (
 func init() {
 	flag.StringVar(&httpAddr, "port", "8081", "The HTTP port to bind to")
 	flag.StringVar(&token, "token", "", "Token for VScale API")
+	flag.Parse()
 }
 
 func main() {
 
+	flag.PrintDefaults()
+	fmt.Println(httpAddr, "===", token, "<<<")
 
 	APIManager := manager.NewAPIManager(
 		vscale.NewClient(token),
