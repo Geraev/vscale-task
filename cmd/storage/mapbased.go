@@ -83,6 +83,6 @@ func (s *MapStorage) GetGroupStatus(groupID int64) (string, bool) {
 	return "", false
 }
 
-func (s *MapStorage) SetGroupStatus(groupID int64) (bool) {
+func (s *MapStorage) SetGroupStatus(groupID int64, status string) bool {
 	return false
 }

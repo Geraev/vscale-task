@@ -3,6 +3,7 @@ package manager
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"time"
 	"vscale-task/cmd/storage"
 
@@ -10,70 +11,76 @@ import (
 )
 
 type APIManager struct {
-	Client  providers.Client
+	client  providers.Client
 	Storage storage.Storage
 }
 
-func NewAPIManager(cl *providers.Client, storage *storage.Storage) APIManager {
+func NewAPIManager(cl providers.Client, storage storage.Storage) APIManager {
 	return APIManager{
-		Client:  *cl,
-		Storage: *storage,
+		client:  cl,
+		Storage: storage,
 	}
 }
 
-func (m *APIManager) CreateServerGroup(servReq *providers.CreateServerRequest, number int) (groupID int64, err error) {
+func (m *APIManager) CreateServerGroup(chAccepted chan<- int64, servReq *providers.CreateServerRequest, number int64) (err error) {
 	if servReq == nil {
-		return 0, errors.New("nil pointer error")
+		return errors.New("nil pointer error")
 	}
 	if number <= 0 {
-		return 0, errors.New("number of server error")
+		return errors.New("number of server error")
 	}
+	//TODO Валидация параметров CreateServerRequest
 
 	var (
-		sleep     = make(chan struct{}, 1)
-		rollback  = make(chan struct{}, 1)
+		sleep     bool
 		interrupt bool
+		counter   int64
 		wg        sync.WaitGroup
+		groupID   = m.Storage.NextGroupID()
 	)
 
-	groupID   = m.Storage.NextGroupID()
-
-	for counter := 0; counter < number && !interrupt; counter++ {
-		select {
-		case <-sleep:
+	m.Storage.SetGroupStatus(groupID, storage.StatusAccepted)
+	chAccepted <- groupID
+	for counter < number && !interrupt {
+		if sleep {
 			time.Sleep(30 * time.Second)
-		case <-rollback:
-			interrupt = true
-		default:
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				var servResp providers.CreateServerResponse
-				servResp, err = m.Client.CreateServer(servReq)
-
-				if err != nil {
-					switch err {
-					case providers.ErrTooManyRequests:
-						sleep <- struct{}{}
-						return
-					default:
-						rollback <- struct{}{}
-						return
-					}
-				}
-
-				m.Storage.AddServer(groupID, servResp.CTID)
-			}()
+			sleep = false
 		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var servResp providers.CreateServerResponse
+			servResp, err = m.client.CreateServer(servReq)
+
+			if err != nil {
+				switch err {
+				case providers.ErrTooManyRequests:
+					sleep = true
+					return
+				default:
+					interrupt = true
+					return
+				}
+			}
+			m.Storage.AddServer(groupID, servResp.CTID)
+			atomic.AddInt64(&counter, 1)
+		}()
+
 	}
 	wg.Wait()
+
 	if interrupt {
-		return 0, ErrNeedRollback
+		m.Storage.SetGroupStatus(groupID, storage.StatusFailed)
+		if err = m.DeleteServerGroup(groupID); err != nil {
+			return ErrFatalApiError
+		}
+		return ErrFatalApiError
 	}
 
-	return groupID, nil
+	m.Storage.SetGroupStatus(groupID, storage.StatusComplete)
+	return nil
 }
-
 
 func (m *APIManager) DeleteServerGroup(groupID int64) (err error) {
 	ctidList, ok := m.Storage.GetServerList(groupID)
@@ -81,39 +88,46 @@ func (m *APIManager) DeleteServerGroup(groupID int64) (err error) {
 		return ErrGroupIDNotFound
 	}
 	var (
-		sleep     = make(chan struct{}, 1)
-		errorOccurred  = make(chan struct{}, 1)
+		sleep     bool
+		interrupt bool
 		wg        sync.WaitGroup
 	)
 
-	for _, ctid := range ctidList {
-		select {
-		case <-sleep:
-			time.Sleep(30 * time.Second)
-		case <-errorOccurred:
-			return ErrDeleteServer
-		default:
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-				var servResp providers.DeleteServerResponse
-				servResp, err = m.Client.DeleteServer(ctid)
-
-				if err != nil {
-					switch err {
-					case providers.ErrTooManyRequests:
-						sleep <- struct{}{}
-						return
-					default:
-						errorOccurred <- struct{}{}
-						return
-					}
-				}
-
-				m.Storage.RemoveServer(groupID, servResp.CTID)
-			}()
+	for i := range ctidList {
+		var ctid = ctidList[i]
+		if interrupt {
+			break
 		}
+		if sleep {
+			time.Sleep(30 * time.Second)
+			sleep = false
+		}
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			var servResp providers.DeleteServerResponse
+			servResp, err = m.client.DeleteServer(ctid)
+
+			if err != nil {
+				switch err {
+				case providers.ErrTooManyRequests:
+					sleep = true
+					return
+				default:
+					interrupt = false
+					return
+				}
+			}
+
+			m.Storage.RemoveServer(groupID, servResp.CTID)
+		}()
 	}
 
+	if interrupt {
+		return ErrDeleteServer
+	}
+
+	m.Storage.SetGroupStatus(groupID, storage.StatusDeleted)
 	return nil
 }

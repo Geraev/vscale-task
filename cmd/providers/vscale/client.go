@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	VSCALE_API_URL = "https://api.vscale.io/v1/"
+	VSCALE_API_URL     = "https://api.vscale.io/v1/"
 	VSCALE_API_SCALETS = "scalets"
 )
 
@@ -119,7 +119,7 @@ func (c *Client) newRequest(method, path string, body interface{}) (*http.Reques
 		}
 	}
 
-	req, err := http.NewRequest(method, VSCALE_API_URL + path, buf)
+	req, err := http.NewRequest(method, VSCALE_API_URL+path, buf)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create new http request with error: %v", err)
 	}
